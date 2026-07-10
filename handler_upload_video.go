@@ -100,6 +100,20 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	videoRand := hex.EncodeToString(randByte)
 	videoKey := fmt.Sprintf("%s.mp4", videoRand)
 
+	videoAspectRatio, err := getVideoAspectRatio(tmpFile.Name())
+	var videoKeyPrefix string
+
+	switch videoAspectRatio {
+	case "16:9":
+		videoKeyPrefix = "landscape"
+	case "9:16":
+		videoKeyPrefix = "portrait"
+	default:
+		videoKeyPrefix = "other"
+	}
+
+	videoKey = videoKeyPrefix + "/" + videoKey
+
 	s3Params := &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),
 		Key:         aws.String(videoKey),
