@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -61,7 +62,12 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if header.Header.Get("Content-Type") == "" || !strings.Contains(header.Header.Get("Content-Type"), "image/") {
+	mediatype, _, err := mime.ParseMediaType(header.Header.Get("Content-Type"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Missing/Invalid Content-Type header", nil)
+		return
+	}
+	if header.Header.Get("Content-Type") == "" || (mediatype != "image/png" && mediatype != "image/jpeg") {
 		respondWithError(w, http.StatusBadRequest, "Missing/Invalid Content-Type header", nil)
 		return
 	}
