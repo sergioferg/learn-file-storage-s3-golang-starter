@@ -89,18 +89,24 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	_, err = tmpFile.Seek(0, io.SeekStart)
+	processedFilepath, err := processVideoForFastStart(tmpFile.Name())
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "couldn't make new video file", err)
+		respondWithError(w, http.StatusInternalServerError, "couldn't process video", err)
 		return
 	}
+	processedFile, err := os.Open(processedFilepath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldn't open processed video", err)
+		return
+	}
+	defer processedFile.Close()
 
 	randByte := make([]byte, 32)
 	rand.Read(randByte)
 	videoRand := hex.EncodeToString(randByte)
 	videoKey := fmt.Sprintf("%s.mp4", videoRand)
 
-	videoAspectRatio, err := getVideoAspectRatio(tmpFile.Name())
+	videoAspectRatio, err := getVideoAspectRatio(processedFile.Name())
 	var videoKeyPrefix string
 
 	switch videoAspectRatio {
@@ -117,7 +123,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	s3Params := &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),
 		Key:         aws.String(videoKey),
-		Body:        tmpFile,
+		Body:        processedFile,
 		ContentType: aws.String(mediatype),
 	}
 	_, err = cfg.s3Client.PutObject(r.Context(), s3Params)
