@@ -85,13 +85,19 @@ func (cfg *apiConfig) handlerVideoGet(w http.ResponseWriter, r *http.Request) {
 	videoIDString := r.PathValue("videoID")
 	videoID, err := uuid.Parse(videoIDString)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid video ID", err)
+		respondWithError(w, http.StatusBadRequest, "invalid video ID", err)
 		return
 	}
 
 	video, err := cfg.db.GetVideo(videoID)
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Couldn't get video", err)
+		respondWithError(w, http.StatusNotFound, "couldn't get video", err)
+		return
+	}
+
+	video, err = cfg.dbVideoToSignedVideo(video)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldn't generate url", err)
 		return
 	}
 
@@ -101,19 +107,27 @@ func (cfg *apiConfig) handlerVideoGet(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) handlerVideosRetrieve(w http.ResponseWriter, r *http.Request) {
 	token, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Couldn't find JWT", err)
+		respondWithError(w, http.StatusUnauthorized, "couldn't find JWT", err)
 		return
 	}
 	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT", err)
+		respondWithError(w, http.StatusUnauthorized, "couldn't validate JWT", err)
 		return
 	}
 
 	videos, err := cfg.db.GetVideos(userID)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve videos", err)
+		respondWithError(w, http.StatusInternalServerError, "couldn't retrieve videos", err)
 		return
+	}
+
+	for i := range videos {
+		videos[i], err = cfg.dbVideoToSignedVideo(videos[i])
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "couldn't generate url", err)
+			return
+		}
 	}
 
 	respondWithJSON(w, http.StatusOK, videos)
